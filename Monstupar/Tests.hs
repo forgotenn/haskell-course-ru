@@ -70,3 +70,124 @@ natListTest = mustFail  ""
           &.& mustFail  "10,20,12,3423,0.,234,234,2342,22342,22232,17583,9573"
           $ natList
 
+doBlockTest = mustParse "do {a; b <- c; do { alsdjflka;jakj; }; akjhad <- do { e; f; qq <- q; }; g;}" 
+          &.& mustParse "a"
+          &.& mustParse "do {a;}"
+          &.& mustParse "do {do {a;}; a <- b;}"
+          &.& mustFail "a <- b <- c"
+          &.& mustFail "a;"
+          &.& mustFail "do {};" 
+          $ doBlock
+
+spaces :: Monstupar Char ()
+spaces = do
+    many $ like (`elem` [' ', '\t', '\n'])
+    return ()
+
+checkLetter :: Char -> Bool
+checkLetter a = ('a' <= a && a <= 'z') || ('A' <= a && a <= 'Z')
+ 
+parseIdentificator :: Monstupar Char String
+parseIdentificator = do
+   s' <- many1 (like checkLetter)
+   return s'
+
+{-
+parseSimpleAction :: Monstupar Char Action
+parseSimpleAction = do
+    spaces
+    a <- parseIdentificator
+    spaces
+    char ';'
+    return $ Action a
+
+parseActionWithArrow :: Monstupar Char Action
+parseActionWithArrow = do
+    spaces
+    a <- parseIdentificator
+    spaces
+    string "<-"
+    spaces
+    b <- parseIdentificator
+    spaces
+    char ';'
+    return $ Assignment a b 
+    
+parseAction :: Monstupar Char Action
+parseAction = do
+    parseSimpleAction <|> parseActionWithArrow
+
+parseDoBlock :: Monstupar Char Action
+parseDoBlock = do
+    spaces
+    string "do"
+    spaces    
+    char '{'
+    a <- many1 parseAction
+    spaces
+    string "};"
+    return $ SimpleDoBlock a
+ 
+parseDoBlockWithAssignment :: Monstupar Char Action
+parseDoBlockWithAssignment = do
+    spaces
+    a <- parseIdentificator
+    spaces
+    string "<-"
+    b <- parseDoBlock
+    return $ DoBlockWithAssignment a b 
+
+data Action = Assignment String String | Action String 
+            | SimpleDoBlock [Action] | DoBlockWithAssignment String Action
+
+doNotation :: Monstupar Char [Action]
+doNotation = undefined
+-}
+
+data Action = Simple String | Composite [DoAction] deriving (Read, Show)
+data DoAction = NoAssignment Action | Assignment String Action deriving (Read, Show)
+
+parseAction :: Monstupar Char Action
+parseAction = parseComposite <|> parseSimple
+
+parseSimple :: Monstupar Char Action
+parseSimple = do
+    spaces
+    a <- parseIdentificator
+    return $ Simple a
+     
+
+parseComposite :: Monstupar Char Action
+parseComposite = do
+    spaces >> string "do" >> spaces >> char '{' >> spaces
+    a <- many1 $ do
+        spaces
+        b <- parseDoAction
+        spaces >> char ';'
+        return b
+    spaces >> char '}'
+    return $ Composite a
+    
+
+parseDoAction :: Monstupar Char DoAction
+parseDoAction = parseAssignment <|> parseNoAssignment 
+
+parseNoAssignment :: Monstupar Char DoAction
+parseNoAssignment = do
+    spaces
+    a <- parseAction
+    return $ NoAssignment a
+ 
+parseAssignment :: Monstupar Char DoAction
+parseAssignment = do
+    spaces
+    a <- parseIdentificator
+    spaces >> string "<-" >> spaces
+    b <- parseAction
+    return $ Assignment a b
+
+doBlock :: Monstupar Char Action
+doBlock = do
+    a <- parseAction
+    eof
+    return a
